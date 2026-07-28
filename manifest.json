@@ -1,0 +1,41 @@
+{
+  "id": "com.universaltill.tax-uk",
+  "name": "UK VAT: Eat-in / Takeaway",
+  "version": "1.0.0",
+  "description": "Implements the UK VAT eat-in/takeaway switch (VAT Notice 709/1): food a merchant sells zero-rated when taken away becomes standard-rated the moment it's eaten on the premises. Pure local logic — no external API, no network permission needed.",
+  "author": "Universal Till",
+  "website": "https://universaltill.com",
+  "canonical_type": "tax",
+  "runtime": "wasm",
+  "device_arch": "any",
+  "min_pos_version": "1.0.0",
+  "countries": ["GB"],
+  "permissions": [
+    "events:receive"
+  ],
+  "locales": [
+    "en-GB"
+  ],
+  "entries": [
+    {
+      "type": "tax",
+      "key": "eatin-standard-rate-uk",
+      "label": "UK Eat-in/Takeaway VAT Switch",
+      "sort_order": 5
+    }
+  ],
+  "settings": [
+    {
+      "key": "eatin_standard_rate_by_tax_code",
+      "default_value": "{}",
+      "scope": "global"
+    }
+  ],
+  "entrypoint": "./bin/plugin.wasm",
+  "hooks": [
+    {
+      "event": "tax.rate.ask",
+      "action": "tax.rate"
+    }
+  ]
+}
