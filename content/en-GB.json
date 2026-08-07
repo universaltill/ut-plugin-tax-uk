@@ -1,0 +1,39 @@
+{
+  "locale": "en-GB",
+  "version": "1.0.0",
+  "rtl": false,
+  "fallback_locale": "en-GB",
+  "categories": [
+    { "id": "what-it-does", "name": "What this plugin does", "sort_order": 1 },
+    { "id": "setup", "name": "Setting it up", "sort_order": 2 }
+  ],
+  "faq_entries": [
+    {
+      "id": "eatin-takeaway-rule",
+      "category": "what-it-does",
+      "question": "What does this plugin change on my till?",
+      "answer": "UK VAT (HMRC VAT Notice 709/1) treats the same food differently depending on where it is eaten: most cold food — a sandwich is the classic example — is zero-rated when a customer takes it away, but becomes standard-rated (currently 20%) the moment it is eaten on your premises. With this plugin installed, when a sale is rung up as eat-in, items whose tax code you have listed in the plugin's setting are automatically charged at the standard rate you configured. Takeaway sales are left alone: each item keeps its own tax code's rate, exactly as before. Hot food and hot drinks are deliberately out of scope — they are standard-rated whether eaten in or taken away, so simply give those items a standard-rate tax code in your catalogue and this plugin will not touch them.",
+      "sort_order": 1,
+      "last_updated": "2026-08-07",
+      "keywords": ["vat", "eat in", "eat-in", "takeaway", "dine in", "zero-rated", "standard rate", "sandwich", "cold food", "hot food", "709/1"]
+    },
+    {
+      "id": "configure-setting",
+      "category": "setup",
+      "question": "How do I choose which items switch to the standard rate for eat-in?",
+      "answer": "Open Plugins, find \"UK VAT: Eat-in / Takeaway\" and open its Settings page. The setting eatin_standard_rate_by_tax_code is a small piece of JSON text that maps each of your own tax codes to the eat-in rate it should charge, written in basis points: 100 basis points = 1%, so 2000 means 20%. For example, if your zero-rated cold-food items use a tax code whose ID is tax_zero, entering {\"tax_zero\": 2000} charges those items 20% VAT on eat-in sales and leaves takeaway sales zero-rated. You can find a tax code's ID on the Settings page where your tax codes are managed — use the ID exactly as shown there, not the display name. You can list several codes at once, e.g. {\"tax_zero\": 2000, \"tax_reduced\": 2000}.",
+      "sort_order": 1,
+      "last_updated": "2026-08-07",
+      "keywords": ["settings", "configure", "tax code", "basis points", "json", "eatin_standard_rate_by_tax_code", "20%", "2000"]
+    },
+    {
+      "id": "rate-did-not-switch",
+      "category": "setup",
+      "question": "Why didn't an item's rate change on an eat-in sale?",
+      "answer": "The plugin only overrides items whose tax code ID appears in the eatin_standard_rate_by_tax_code setting. If a rate did not switch, check three things: the sale really was rung up as eat-in (takeaway sales are never changed); the item's tax code ID is spelt in the setting exactly as it appears in your tax-code list; and the setting is valid JSON (a missing quote or comma makes the whole map unreadable, and the plugin then quietly declines and every item keeps its own rate). Hot food and drink are not handled here at all — give those items a standard-rate tax code directly.",
+      "sort_order": 2,
+      "last_updated": "2026-08-07",
+      "keywords": ["troubleshooting", "not working", "rate", "override", "declines", "takeaway", "hot food"]
+    }
+  ]
+}

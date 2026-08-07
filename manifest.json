@@ -22,6 +22,13 @@
       "key": "eatin-standard-rate-uk",
       "label": "UK Eat-in/Takeaway VAT Switch",
       "sort_order": 5
+    },
+    {
+      "type": "page",
+      "key": "docs",
+      "label": "How this works",
+      "route": "/plugin/tax-uk/docs",
+      "sort_order": 90
     }
   ],
   "settings": [

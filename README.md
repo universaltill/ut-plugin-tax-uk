@@ -45,6 +45,14 @@ This plugin only handles the *switch*. It answers `tax.rate.ask`:
   `takeaway_rate_overrides` setting — a real catalog-integrated settings UI
   is a follow-up, not built here.
 
+## In-till documentation (Docs button)
+
+The manifest registers a `type: "page"` entry with the reserved key `docs`
+(ADR-0037), shipping `content/en-GB.json` — so once installed, the till's
+Plugins manager shows a Docs button on this plugin's card that opens this
+same eat-in/takeaway explanation and the `eatin_standard_rate_by_tax_code`
+walkthrough directly inside the POS, aimed at the shop owner.
+
 ## Verified
 
 Built (`scripts/build.sh`) and run through a real wazero runtime (the same

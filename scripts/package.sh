@@ -14,7 +14,7 @@ VERSION=$(python3 -c "import json;print(json.load(open('manifest.json'))['versio
 OUT="dist/${ID}_${VERSION}_universal.tar.gz"
 mkdir -p dist
 
-entries=(manifest.json README.md bin)
+entries=(manifest.json README.md bin content)
 [ -f LICENSE ] && entries+=(LICENSE)
 # COPYFILE_DISABLE stops macOS tar shipping AppleDouble ._* junk (the
 # marketplace bundle-hygiene gate rejects it).
