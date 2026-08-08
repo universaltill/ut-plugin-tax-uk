@@ -16,6 +16,7 @@ mkdir -p dist
 
 entries=(manifest.json README.md bin)
 [ -f LICENSE ] && entries+=(LICENSE)
+[ -d content ] && entries+=(content)
 # COPYFILE_DISABLE stops macOS tar shipping AppleDouble ._* junk (the
 # marketplace bundle-hygiene gate rejects it).
 COPYFILE_DISABLE=1 tar -czf "$OUT" "${entries[@]}"

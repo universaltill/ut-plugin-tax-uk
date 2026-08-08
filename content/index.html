@@ -1,0 +1,48 @@
+<h2>What this does</h2>
+<p>
+  UK VAT law (HMRC VAT Notice 709/1) treats most cold food differently
+  depending on how a customer takes it: <strong>zero-rated when taken
+  away</strong>, but <strong>standard-rated when eaten on the premises</strong>.
+  This plugin applies that switch automatically at checkout — you don't
+  need to ring up a different item or remember to change anything by hand.
+</p>
+
+<h2>How it decides</h2>
+<ul>
+  <li><strong>Takeaway order</strong> — no change. The item's own tax code
+    (usually zero-rated) applies as normal.</li>
+  <li><strong>Eat-in order</strong> — if the item's tax code is one you've
+    configured below, its rate is switched to the standard rate for that
+    sale. If the tax code isn't configured, nothing changes — this covers
+    items you never want switched, like hot food and drinks, which are
+    standard-rated regardless of eat-in or takeaway and don't need this
+    plugin's help.</li>
+</ul>
+
+<h2>Configuring which tax codes switch</h2>
+<p>
+  Open this plugin's settings and edit
+  <code>eatin_standard_rate_by_tax_code</code> — a JSON object mapping one
+  of your shop's own tax code IDs to the standard rate you want applied for
+  eat-in, in basis points (2000 = 20%):
+</p>
+<pre>{"tax_zero": 2000}</pre>
+<p>
+  This maps your zero-rated tax code to 20% VAT when a sale is marked
+  eat-in. To find a tax code's ID, open <strong>Catalog</strong>, open any
+  item using that code, and check its <strong>Tax code</strong> field — the
+  same codes also appear in that field's suggestion list. You can list more
+  than one tax code if your catalog uses several zero-rated codes for
+  different categories of cold food.
+</p>
+
+<h2>What this plugin does <em>not</em> do</h2>
+<ul>
+  <li>It doesn't touch hot food/drink — those keep whatever tax code you
+    assigned them directly in the catalog.</li>
+  <li>It doesn't make the eat-in/takeaway choice for you — that's the order
+    type toggle already on the sale screen and self-order kiosk.</li>
+  <li>It's a simplified reading of Notice 709/1 covering the common
+    cold-food case; unusual combinations (mixed hot/cold platters,
+    catering, delivery) aren't modelled and may need a manual override.</li>
+</ul>

@@ -25,6 +25,15 @@ if m.get("countries") != ["GB"]: errs.append("countries must be ['GB'] (ADR-0025
 types = [e.get("type") for e in m.get("entries", [])]
 if "tax" not in types: errs.append("expected an entries[] item with type=tax")
 if "net:" in " ".join(m.get("permissions", [])): errs.append("this plugin makes no outbound calls — no net: permission should be requested")
+# A declared "docs" page entry (ADR-0037) must ship real content, or the
+# Docs button opens the "registered a page but ships no page content" stub
+# — the broken affordance ut-docs#406's AC3 explicitly forbids.
+for e in m.get("entries", []):
+    if e.get("type") == "page" and e.get("key") == "docs":
+        has_bundle = os.path.isdir("content") and any(f.endswith(".json") for f in os.listdir("content"))
+        has_static = os.path.isfile("content/index.html")
+        if not (has_bundle or has_static):
+            errs.append("entries[] declares a docs page but content/index.html or content/<locale>.json is missing")
 if errs:
     print("FAIL: " + "; ".join(errs)); sys.exit(1)
 print(f"ok {m['id']} v{m['version']}")

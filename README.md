@@ -35,6 +35,16 @@ This plugin only handles the *switch*. It answers `tax.rate.ask`:
   that standard rate. If not present (the tax code isn't in the map — e.g.
   it's a hot item or something else entirely), declines, same as takeaway.
 
+## In-till documentation
+
+This plugin ships a `docs` page entry (`ut-docs` ADR-0037 — plugin docs
+ride the existing plugin-page mechanism, `content/index.html`), so
+`/plugins` shows a **Docs** button for it once installed. The button opens
+the same explanation as this README's "What this does" / "Configuring"
+sections, rendered inside the till — works with the network down, no
+separate viewer. Keep `content/index.html` in sync with this README
+whenever the switching logic or the settings key changes.
+
 ## Configure (plugin settings)
 
 - `eatin_standard_rate_by_tax_code` — a JSON object, `tax_code_id` →
