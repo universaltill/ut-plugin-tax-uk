@@ -27,6 +27,8 @@ import (
 	"os"
 	"strings"
 	"unsafe"
+
+	"github.com/universaltill/ut-plugin-tax-uk/src/chargepolicy"
 )
 
 // --- host functions (module "ut", see ut-docs reference/plugin-host-functions.md) ---
@@ -149,6 +151,14 @@ func main() {
 	switch ev.Type {
 	case "tax.rate.ask":
 		handleTaxRateAsk(raw)
+
+	// ADR-0061 Decision 1 (ut-docs#975): the UK's service-charge/tip
+	// policy. A constant, offline answer — the payload is deliberately
+	// empty (a whole-store ask), so there is nothing to read from it.
+	case "charge.policy.ask":
+		out, _ := json.Marshal(chargepolicy.GB())
+		os.Stdout.Write(out)
+		os.Exit(0)
 	default:
 		logf("tax-uk: unhandled event type %q", ev.Type)
 		os.Exit(0)
