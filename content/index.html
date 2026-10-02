@@ -52,6 +52,35 @@
   <li><strong>Tips</strong> — go to your staff by default, as the
     Employment (Allocation of Tips) Act 2023 requires.</li>
 </ul>
+<h2>MTD VAT return (HMRC test service only)</h2>
+<p>
+  The plugin adds an <strong>MTD VAT Return to HMRC (sandbox)</strong>
+  export under <strong>Data &rarr; Export</strong>. It works out
+  <strong>Box 1</strong> (VAT on sales) and <strong>Box 6</strong> (sales
+  before VAT, whole pounds) from your closed days, and sends the return to
+  HMRC's <em>test</em> service. It cannot send a real return to HMRC yet.
+</p>
+<ul>
+  <li>Choose a date range that is <strong>exactly</strong> one of your open
+    VAT periods. If it doesn't match, nothing is sent and the open periods
+    are listed.</li>
+  <li>Close every trading day first &mdash; only closed days are counted.</li>
+  <li>Boxes 2, 4, 7, 8 and 9 come from your purchase records, which the
+    till doesn't have. Enter them in the plugin settings
+    (<code>hmrc_box2_vat_due_acquisitions</code>,
+    <code>hmrc_box4_vat_reclaimed</code>,
+    <code>hmrc_box7_purchases_ex_vat</code>,
+    <code>hmrc_box8_goods_supplied_ex_vat</code>,
+    <code>hmrc_box9_acquisitions_ex_vat</code>) before each return. Enter
+    <code>0</code> for a box that doesn't apply. Boxes 3 and 5 are worked
+    out for you.</li>
+  <li>The HMRC connection settings (<code>hmrc_client_id</code>,
+    <code>hmrc_client_secret</code>, <code>hmrc_refresh_token</code>,
+    <code>hmrc_vrn</code>) need to be set up once, outside the till, by
+    whoever manages your HMRC access. If any setting is missing, the export
+    tells you which one.</li>
+</ul>
+
 <h2>What this plugin does <em>not</em> do</h2>
 <ul>
   <li>It doesn't touch hot food/drink — those keep whatever tax code you
@@ -61,4 +90,7 @@
   <li>It's a simplified reading of Notice 709/1 covering the common
     cold-food case; unusual combinations (mixed hot/cold platters,
     catering, delivery) aren't modelled and may need a manual override.</li>
+  <li>It doesn't send real VAT returns to HMRC, and it doesn't work out
+    Boxes 2, 4, 7, 8 or 9. Ask your accountant before relying on the
+    figures.</li>
 </ul>

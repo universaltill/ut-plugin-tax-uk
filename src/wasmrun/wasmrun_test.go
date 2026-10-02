@@ -1,7 +1,10 @@
 // Package wasmrun_test runs the REAL compiled plugin through a real wazero
 // runtime — the same engine `universal-till` uses
-// (internal/plugins/wasm_runtime.go) — with a minimal stand-in for the two
-// host functions this plugin imports (`ut.log_write`, `ut.settings_get`).
+// (internal/plugins/wasm_runtime.go) — with a minimal stand-in for the five
+// host functions this plugin imports (`ut.log_write`, `ut.settings_get`,
+// and, since ut-docs#1475's MTD VAT bridge, `ut.http_request`,
+// `ut.storage_get`, `ut.storage_set`). Every import needs a stub here or
+// the module will not instantiate at all.
 //
 // Why this exists (ut-docs#975 review): `src/main.go` is `GOOS=wasip1`-only,
 // so neither `go test ./...` nor a host `go vet` ever sees its event
@@ -23,6 +26,7 @@ package wasmrun_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io/fs"
 	"os"
@@ -41,13 +45,40 @@ import (
 // sibling plugin): data calls return the FULL length of the value — the
 // guest retries with a bigger buffer if that exceeds its cap. Negative
 // returns are host errors.
-const hostErrNotFound = -1
+const (
+	hostErrNotFound = -1
+	hostErrDenied   = -2
+)
 
-// stubHost is the fake till: settings plus captured log lines.
+// httpCall is one request the guest made, captured for assertions (same
+// envelope as universal-till's hostHTTPRequest and ut-plugin-tax-de's stub).
+type httpCall struct {
+	Method  string            `json:"method"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+	BodyB64 string            `json:"body_b64"`
+}
+
+// Body decodes the request body. The host ABI carries bodies base64-encoded
+// in BOTH directions (`body_b64`).
+func (c httpCall) Body() string {
+	b, err := base64.StdEncoding.DecodeString(c.BodyB64)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// stubHost is the fake till: settings, storage, a scripted HTTP layer and
+// captured log lines. No real network call is ever made: respond answers
+// every http_request, and a nil respond answers a transport failure.
 type stubHost struct {
 	mu       sync.Mutex
 	settings map[string]string
+	storage  map[string][]byte
 	logs     []string
+	calls    []httpCall
+	respond  func(c httpCall) (status int, body string, ok bool)
 }
 
 func writeOut(mem api.Memory, dstPtr, dstCap uint32, val []byte) int32 {
@@ -78,6 +109,49 @@ func (h *stubHost) register(ctx context.Context, r wazero.Runtime) error {
 		}
 		return writeOut(m.Memory(), dstPtr, dstCap, []byte(v))
 	}).Export("settings_get").
+		NewFunctionBuilder().WithFunc(func(ctx context.Context, m api.Module, kPtr, kLen, dstPtr, dstCap uint32) int32 {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		v, ok := h.storage[readStr(m.Memory(), kPtr, kLen)]
+		if !ok {
+			return hostErrNotFound
+		}
+		return writeOut(m.Memory(), dstPtr, dstCap, v)
+	}).Export("storage_get").
+		NewFunctionBuilder().WithFunc(func(ctx context.Context, m api.Module, kPtr, kLen, vPtr, vLen uint32) int32 {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		k := readStr(m.Memory(), kPtr, kLen)
+		b, _ := m.Memory().Read(vPtr, vLen)
+		cp := make([]byte, len(b))
+		copy(cp, b)
+		if h.storage == nil {
+			h.storage = map[string][]byte{}
+		}
+		h.storage[k] = cp
+		return 0
+	}).Export("storage_set").
+		NewFunctionBuilder().WithFunc(func(ctx context.Context, m api.Module, rPtr, rLen, dstPtr, dstCap uint32) int32 {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		var req httpCall
+		if err := json.Unmarshal([]byte(readStr(m.Memory(), rPtr, rLen)), &req); err != nil {
+			return -4 // invalid
+		}
+		h.calls = append(h.calls, req)
+		if h.respond == nil {
+			return hostErrDenied
+		}
+		status, body, ok := h.respond(req)
+		if !ok {
+			return hostErrDenied
+		}
+		out, _ := json.Marshal(map[string]any{
+			"status":   status,
+			"body_b64": base64.StdEncoding.EncodeToString([]byte(body)),
+		})
+		return writeOut(m.Memory(), dstPtr, dstCap, out)
+	}).Export("http_request").
 		Instantiate(ctx)
 	return err
 }
