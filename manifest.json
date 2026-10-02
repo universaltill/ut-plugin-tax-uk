@@ -1,8 +1,8 @@
 {
   "id": "com.universaltill.tax-uk",
   "name": "UK VAT: Eat-in / Takeaway",
-  "version": "1.1.0",
-  "description": "Implements the UK VAT eat-in/takeaway switch (VAT Notice 709/1): food a merchant sells zero-rated when taken away becomes standard-rated the moment it's eaten on the premises. Pure local logic — no external API, no network permission needed.",
+  "version": "1.2.0",
+  "description": "Implements the UK VAT eat-in/takeaway switch (VAT Notice 709/1) and the UK service-charge/tip defaults, plus a sandbox-only Making Tax Digital (MTD) VAT return bridge: Box 1 and Box 6 computed from archived day-closes, the remaining boxes merchant-entered, submitted server-to-server to HMRC's test API.",
   "author": "Universal Till",
   "website": "https://universaltill.com",
   "canonical_type": "tax",
@@ -11,7 +11,10 @@
   "min_pos_version": "1.0.0",
   "countries": ["GB"],
   "permissions": [
-    "events:receive"
+    "events:receive",
+    "sales:read",
+    "net:test-api.service.hmrc.gov.uk",
+    "storage"
   ],
   "locales": [
     "en-GB"
@@ -29,12 +32,71 @@
       "label": "How the eat-in/takeaway VAT switch works",
       "route": "/plugin/tax-uk-docs",
       "sort_order": 10
+    },
+    {
+      "type": "export",
+      "key": "mtd-vat-return-uk",
+      "label": "tax_uk.entry_mtd_vat_label",
+      "sort_order": 10,
+      "entities": [
+        "eod_closes"
+      ]
     }
   ],
   "settings": [
     {
       "key": "eatin_standard_rate_by_tax_code",
       "default_value": "{}",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_client_id",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_client_secret",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_refresh_token",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_vrn",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_api_base",
+      "default_value": "https://test-api.service.hmrc.gov.uk",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_box2_vat_due_acquisitions",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_box4_vat_reclaimed",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_box7_purchases_ex_vat",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_box8_goods_supplied_ex_vat",
+      "default_value": "",
+      "scope": "global"
+    },
+    {
+      "key": "hmrc_box9_acquisitions_ex_vat",
+      "default_value": "",
       "scope": "global"
     }
   ],
@@ -47,6 +109,10 @@
     {
       "event": "charge.policy.ask",
       "action": "charge.policy"
+    },
+    {
+      "event": "export.requested.ask",
+      "action": "export.mtd_vat"
     }
   ]
 }

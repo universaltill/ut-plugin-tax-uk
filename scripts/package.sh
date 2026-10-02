@@ -17,6 +17,10 @@ mkdir -p dist
 entries=(manifest.json README.md bin)
 [ -f LICENSE ] && entries+=(LICENSE)
 [ -d content ] && entries+=(content)
+# locales/ carries the translations for manifest entries[].label keys (e.g.
+# tax_uk.entry_mtd_vat_label). Leaving it out ships those labels as raw
+# keys — the exact bug ut-plugin-tax-de shipped (ut-docs#1883).
+[ -d locales ] && entries+=(locales)
 # COPYFILE_DISABLE stops macOS tar shipping AppleDouble ._* junk (the
 # marketplace bundle-hygiene gate rejects it).
 COPYFILE_DISABLE=1 tar -czf "$OUT" "${entries[@]}"
