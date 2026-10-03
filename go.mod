@@ -1,6 +1,6 @@
 module github.com/universaltill/ut-plugin-tax-uk
 
-go 1.22.0
+go 1.27.1
 
 // Test-only: src/wasmrun runs the compiled plugin.wasm through the same
 // engine universal-till uses. Nothing shipped in bin/plugin.wasm imports it.
