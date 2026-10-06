@@ -37,6 +37,21 @@ for p in ("sales:read", "storage"):
         errs.append(f"missing permission {p} (MTD export: eod_closes needs sales:read, token cache needs storage)")
 if "export.requested.ask" not in [h.get("event") for h in m.get("hooks", [])]:
     errs.append("hooks[] must declare export.requested.ask for the MTD export entry")
+# A map/list-typed setting must declare a real JSON object/list default, not
+# a JSON string that merely contains one ("{}"): core's install path
+# json.Marshal()s default_value, so a string-wrapped "{}" is stored
+# double-encoded and the plugin later reads a string, not a map — this broke
+# ut-plugin-tax-de's takeaway_rate_overrides in production (ut-docs#1255,
+# ut-docs#1270). Plain-string defaults ("", URLs) don't parse to a dict/list.
+for s in m.get("settings", []):
+    dv = s.get("default_value")
+    if isinstance(dv, str):
+        try:
+            parsed = json.loads(dv)
+        except ValueError:
+            continue
+        if isinstance(parsed, (dict, list)):
+            errs.append(f"setting {s.get('key')}'s default_value is a JSON-string-wrapped object/list ({dv!r}) instead of a real JSON object/list — double-encodes at plugin-install time (ut-docs#1255, ut-docs#1270)")
 defaults = {s.get("key"): s.get("default_value") for s in m.get("settings", [])}
 for k in ("hmrc_client_id","hmrc_client_secret","hmrc_refresh_token","hmrc_vrn","hmrc_box2_vat_due_acquisitions","hmrc_box4_vat_reclaimed","hmrc_box7_purchases_ex_vat","hmrc_box8_goods_supplied_ex_vat","hmrc_box9_acquisitions_ex_vat"):
     if k not in defaults: errs.append(f"missing setting {k}")

@@ -73,8 +73,10 @@ host function exposes device metadata), never invented.
   which builds and runs the real wasm module.
 - `bash scripts/build.sh` (cross-compiles `GOOS=wasip1 GOARCH=wasm`).
 - `bash scripts/validate.sh` (manifest shape: `canonical_type: tax`,
-  `countries: ["GB"]`, one `tax`-type entry, the MTD export entry, and
-  `net:test-api.service.hmrc.gov.uk` as the only `net:` permission).
+  `countries: ["GB"]`, one `tax`-type entry, the MTD export entry,
+  `net:test-api.service.hmrc.gov.uk` as the only `net:` permission, and that
+  no map/list-typed setting's `default_value` is a JSON-string-wrapped
+  object/list instead of a real one — ut-docs#1255/#1270).
 - `bash scripts/guard-plugin-i18n.sh` (locale drift; key-shaped manifest
   labels resolve in `locales/en.json`). `scripts/package.sh` must keep
   shipping `locales/` (ut-docs#1883).
