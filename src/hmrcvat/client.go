@@ -49,7 +49,7 @@ const (
 	// Fraud Prevention Headers. VendorVersion must equal manifest.json's
 	// version (pinned by TestVendorVersionMatchesManifest).
 	VendorProductName = "Universal Till"
-	VendorVersion     = "1.2.0"
+	VendorVersion     = "1.2.1"
 	vendorSoftwareKey = "ut-plugin-tax-uk"
 
 	// TokenStorageKey is the plugin-storage key the access token and the
