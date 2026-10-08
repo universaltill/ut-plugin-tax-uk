@@ -68,7 +68,7 @@ const (
 	obligationsBody   = `{"obligations":[{"periodKey":"26A1","start":"2026-07-01","end":"2026-09-30","due":"2026-11-07","status":"O"},{"periodKey":"26A2","start":"2026-10-01","end":"2026-12-31","due":"2027-02-07","status":"O"}]}`
 	submitReceipt     = `{"processingDate":"2026-10-02T10:15:00.000Z","paymentIndicator":"BANK","formBundleNumber":"256660290587","chargeRefNumber":"aCxFaNx0FZsCvyWF"}`
 	wantSubmitBody    = `{"periodKey":"26A1","vatDueSales":69.10,"vatDueAcquisitions":0.00,"totalVatDue":69.10,"vatReclaimedCurrPeriod":15.00,"netVatDue":54.10,"totalValueSalesExVAT":404,"totalValuePurchasesExVAT":900,"totalValueGoodsSuppliedExVAT":0,"totalAcquisitionsExVAT":0,"finalised":true}`
-	wantVendorVersion = "ut-plugin-tax-uk=1.2.1"
+	wantVendorVersion = "ut-plugin-tax-uk=1.2.2"
 )
 
 // happyHMRC answers the three sandbox calls; anything else is a test bug.

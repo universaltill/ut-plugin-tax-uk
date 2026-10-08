@@ -345,6 +345,12 @@ func handleMTDVATExport(from, to string, closes []hmrcvat.EODCloseExport) {
 }
 
 // taxRateAskPayload mirrors universal-till's internal/pages/tax_hook.go.
+// OrderType has three wire values: "" (dine-in/eat-in, the unchanged
+// default), "takeaway", and "none" (the shop has the dine-in/takeaway choice
+// switched off, sale.order_type_prompt = off, ut-docs#3632 — there is no
+// consumption-mode distinction, so the item's own rate must apply). Only ""
+// is eat-in; anything else, including a value this plugin has never heard of,
+// is treated as "not eat-in" (see handleTaxRateAsk's fail-safe).
 type taxRateAskPayload struct {
 	ItemID    string `json:"item_id"`
 	TaxCodeID string `json:"tax_code_id"`
@@ -363,6 +369,11 @@ type taxRateAskPayload struct {
 // tax_code_id -> basis points), not hardcoded: a shop's own tax-code IDs
 // aren't knowable in advance, same reasoning as ut-plugin-tax-de's
 // takeaway_rate_overrides setting.
+//
+// Fail-safe: ONLY order_type "" (eat-in) consults that setting. "takeaway",
+// "none" and ANY unknown value decline (empty stdout, exit 0) without
+// reading the setting, so an unrecognised value can never apply the eat-in
+// uplift.
 func handleTaxRateAsk(raw []byte) {
 	var wrapper struct {
 		Payload json.RawMessage `json:"payload"`
@@ -371,8 +382,10 @@ func handleTaxRateAsk(raw []byte) {
 	var ask taxRateAskPayload
 	_ = json.Unmarshal(wrapper.Payload, &ask)
 
-	if ask.OrderType == "takeaway" {
-		os.Exit(0) // takeaway: the item's own (typically zero-rated) tax code already applies
+	if ask.OrderType != "" {
+		// takeaway / none / unknown: the item's own (typically zero-rated)
+		// tax code already applies; never read the eat-in setting.
+		os.Exit(0)
 	}
 
 	overrides := map[string]int{}

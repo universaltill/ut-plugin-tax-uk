@@ -41,6 +41,11 @@ Real UK law (VAT Notice 709/1), not invented:
 This plugin only handles the *switch*. It answers `tax.rate.ask`:
 - `order_type == "takeaway"` → declines (no override). The item's own tax
   code — typically zero-rated — already applies.
+- `order_type == "none"` (the shop has the dine-in/takeaway choice switched
+  off, `sale.order_type_prompt = off`) → declines: there is no
+  consumption-mode distinction, so the item's own rate applies.
+- Any other, unrecognised `order_type` → declines too, without reading the
+  setting (fail-safe: an unknown value never applies the eat-in uplift).
 - `order_type == ""` (eat-in/dine-in) → looks up the item's `tax_code_id` in
   the `eatin_standard_rate_by_tax_code` setting; if present, answers with
   that standard rate. If not present (the tax code isn't in the map — e.g.
@@ -220,13 +225,16 @@ whenever the switching logic or the settings key changes.
 Built (`scripts/build.sh`) and run through a real wazero runtime (the same
 engine `universal-till` uses) with a minimal host-function stub, covering
 all three cases: takeaway declines, eat-in with a configured override
-answers the standard rate, eat-in with no override configured declines.
+answers the standard rate, eat-in with no override configured declines
+(plus `order_type` `"none"` and unknown values, which decline without
+reading the setting).
 Since `ut-docs#975` that run is a **committed test suite**, `src/wasmrun/`
 (`go test ./...` runs it in CI): it compiles the current source to wasm,
 executes it under wazero with stubbed `log_write`/`settings_get`, and pins
 the exact stdout for `charge.policy.ask` (decoded strictly against a
-mirror of core's `chargePolicyAskResponse`), the eat-in and takeaway
-`tax.rate.ask` cases, an unhandled event answering nothing, and that
+mirror of core's `chargePolicyAskResponse`), the eat-in, takeaway,
+`"none"` and unknown-value `tax.rate.ask` cases (the latter never read the
+eat-in setting), an unhandled event answering nothing, and that
 `manifest.json` declares the `charge.policy.ask` hook. Proven to bite:
 renaming the `main.go` case, changing `GB()`'s rate, or dropping the
 manifest hook each fail it. Since `ut-docs#1475` it also stubs

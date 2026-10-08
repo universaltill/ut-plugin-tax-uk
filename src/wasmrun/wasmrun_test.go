@@ -77,6 +77,7 @@ type stubHost struct {
 	settings map[string]string
 	storage  map[string][]byte
 	logs     []string
+	reads    []string // setting keys the guest asked for, in order
 	calls    []httpCall
 	respond  func(c httpCall) (status int, body string, ok bool)
 }
@@ -103,7 +104,9 @@ func (h *stubHost) register(ctx context.Context, r wazero.Runtime) error {
 		NewFunctionBuilder().WithFunc(func(ctx context.Context, m api.Module, kPtr, kLen, dstPtr, dstCap uint32) int32 {
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		v, ok := h.settings[readStr(m.Memory(), kPtr, kLen)]
+		key := readStr(m.Memory(), kPtr, kLen)
+		h.reads = append(h.reads, key)
+		v, ok := h.settings[key]
 		if !ok {
 			return hostErrNotFound
 		}
@@ -338,6 +341,21 @@ func TestTaxRateAsk_EatInConfiguredCodeAnswersStandardRate(t *testing.T) {
 	}
 }
 
+// TestTaxRateAsk_EatInUnconfiguredCodeAnswersNothing: an eat-in line whose
+// tax code has no entry in eatin_standard_rate_by_tax_code (e.g. hot food,
+// already standard-rated) gets no opinion, so the till keeps its own rate.
+func TestTaxRateAsk_EatInUnconfiguredCodeAnswersNothing(t *testing.T) {
+	wasm := buildWasm(t)
+	h := &stubHost{settings: map[string]string{
+		"eatin_standard_rate_by_tax_code": `{"tax_zero":2000}`,
+	}}
+	const ask = `{"type":"tax.rate.ask","payload":{"item_id":"item-soup","tax_code_id":"tax_standard","tax_rate_bp":2000,"order_type":""}}`
+	out, _ := run(t, wasm, h, ask)
+	if strings.TrimSpace(out) != "" {
+		t.Fatalf("eat-in line with an unconfigured tax code produced an answer, want no opinion (empty stdout): %q", out)
+	}
+}
+
 // TestTaxRateAsk_TakeawayAnswersNothing pins the takeaway short-circuit at
 // the compiled-plugin level: no override is ever consulted, stdout stays
 // empty, and the till keeps the item's own (zero) rate.
@@ -350,6 +368,32 @@ func TestTaxRateAsk_TakeawayAnswersNothing(t *testing.T) {
 	out, _ := run(t, wasm, h, ask)
 	if strings.TrimSpace(out) != "" {
 		t.Fatalf("takeaway produced an answer, want no opinion (empty stdout): %q", out)
+	}
+}
+
+// TestTaxRateAsk_NonEatInOrderTypesAnswerNothing pins the fail-safe: only
+// order_type "" (eat-in) may consult the eat-in override. "none" (the shop
+// has the dine-in/takeaway choice off, ut-docs#3632 — the item's own rate
+// must apply) and ANY unknown value decline without even reading the
+// setting, so an unrecognised value can never apply the eat-in uplift.
+func TestTaxRateAsk_NonEatInOrderTypesAnswerNothing(t *testing.T) {
+	wasm := buildWasm(t)
+	for _, ot := range []string{"takeaway", "none", "delivery", "Takeaway", " "} {
+		t.Run(ot, func(t *testing.T) {
+			h := &stubHost{settings: map[string]string{
+				"eatin_standard_rate_by_tax_code": `{"tax_zero":2000}`,
+			}}
+			ask := `{"type":"tax.rate.ask","payload":{"item_id":"item-sandwich","tax_code_id":"tax_zero","tax_rate_bp":0,"order_type":"` + ot + `"}}`
+			out, _ := run(t, wasm, h, ask)
+			if strings.TrimSpace(out) != "" {
+				t.Fatalf("order_type %q produced an answer, want no opinion (empty stdout): %q", ot, out)
+			}
+			for _, k := range h.reads {
+				if k == "eatin_standard_rate_by_tax_code" {
+					t.Fatalf("order_type %q read the eat-in override setting; it must not consult it", ot)
+				}
+			}
+		})
 	}
 }
 

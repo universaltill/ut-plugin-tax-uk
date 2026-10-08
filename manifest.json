@@ -1,7 +1,7 @@
 {
   "id": "com.universaltill.tax-uk",
   "name": "UK VAT: Eat-in / Takeaway",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Implements the UK VAT eat-in/takeaway switch (VAT Notice 709/1) and the UK service-charge/tip defaults, plus a sandbox-only Making Tax Digital (MTD) VAT return bridge: Box 1 and Box 6 computed from archived day-closes, the remaining boxes merchant-entered, submitted server-to-server to HMRC's test API.",
   "author": "Universal Till",
   "website": "https://universaltill.com",
