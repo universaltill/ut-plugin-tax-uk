@@ -72,6 +72,32 @@ a constant, offline answer (`src/chargepolicy/`):
   needing a business-case mapping (unlike `ut-plugin-tax-de`).
 - No `charges` key: the UK has no additive statutory levy (ADR-0062).
 
+## VAT return figures for your accountant (`vat-figures-uk`)
+
+Export entry `vat-figures-uk` (label key `tax_uk.entry_vat_figures_label`,
+entity `eod_closes`), from **Data → Export** with a from/to range
+(ut-docs#5052). Pure local computation from the archived day-closes
+(Z-reports) — **no HMRC connection, no `hmrc_*` setting, no network call** —
+returned as a CSV download `vat-figures-<from>_<to>.csv`:
+
+- **Box 1** = sum of the closes' cross-tab `tax`; **Box 6** = sum of `net`,
+  whole pounds, pence left out — the same sums the HMRC bridge uses
+  (`hmrcvat.BuildFigures` / `BuildSubmitRequest`).
+- Boxes 2, 4, 7, 8, 9 are left **blank** (a till has no purchase ledger);
+  Boxes 3 and 5 are not shown because they depend on those.
+- Also: exact net sales, a per-VAT-rate table and one line per Z-number
+  (with its window from/to — current core sets `report.from`/`to`, not
+  `day`, ADR-0066) so the accountant can reconcile. A **WARNING** row lists
+  Z-numbers missing between the lowest and highest close in the range
+  (core skips an unreadable archive row with only a log line).
+- The CSV states it assumes standard (invoice-basis) VAT accounting, not
+  the Flat Rate Scheme.
+- Same refusals as the bridge: explicit range, at least one close, and a
+  close with sales but no cross-tab is refused by Z-number.
+- It is labelled "figures for your accountant", never a filed return.
+  Whether the cross-tab is the right Box 1/6 source for flat-rate or
+  cash-accounting schemes is the same open accountant question as above.
+
 ## MTD VAT return bridge (sandbox only)
 
 Export entry `mtd-vat-return-uk` (label key `tax_uk.entry_mtd_vat_label`,

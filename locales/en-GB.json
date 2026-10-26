@@ -1,3 +1,4 @@
 {
-  "tax_uk.entry_mtd_vat_label": "MTD VAT Return to HMRC (sandbox)"
+  "tax_uk.entry_mtd_vat_label": "MTD VAT Return to HMRC (sandbox)",
+  "tax_uk.entry_vat_figures_label": "VAT return figures for your accountant (CSV)"
 }

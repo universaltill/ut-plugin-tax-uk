@@ -49,7 +49,7 @@ const (
 	// Fraud Prevention Headers. VendorVersion must equal manifest.json's
 	// version (pinned by TestVendorVersionMatchesManifest).
 	VendorProductName = "Universal Till"
-	VendorVersion     = "1.2.2"
+	VendorVersion     = "1.3.0"
 	vendorSoftwareKey = "ut-plugin-tax-uk"
 
 	// TokenStorageKey is the plugin-storage key the access token and the
@@ -140,6 +140,11 @@ type EODCloseExport struct {
 // EODReportForExport carries the archived Z-report fields Box 1/6 read.
 type EODReportForExport struct {
 	Day string `json:"day"`
+	// From/To are the close's window as RFC3339 instants (ADR-0066: current
+	// core leaves Day empty and sets these; From is empty on the till's
+	// first-ever close). Read only by the accountant export (ut-docs#5052).
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
 	// Gross is the close's own headline gross (core's EODReport.Gross). Read
 	// only to detect a close that HAD sales but carries no cross-tab (an
 	// archive row from before ut-docs#1004 added method_tax_bands) — such a

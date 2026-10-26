@@ -7,6 +7,7 @@ package wasmrun_test
 // HMRC's sandbox, and the exact stdout core's data_api.go decodes.
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/url"
 	"os"
@@ -49,11 +50,11 @@ func mtdSettings() map[string]string {
 // Same two closes as src/hmrcvat's fixtureCloses (incl. one refund cell),
 // in core's real export.requested.ask envelope.
 const mtdClosesJSON = `[
- {"z_number":41,"report":{"day":"2026-07-01","gross":46459,"method_tax_bands":[
+ {"z_number":41,"report":{"from":"2026-07-01T09:00:00+01:00","to":"2026-07-01T21:00:00+01:00","gross":46459,"method_tax_bands":[
    {"method":"cash","rate_bp":2000,"net":10000,"tax":2000,"gross":12000},
    {"method":"card","rate_bp":2000,"net":25050,"tax":5010,"gross":30060},
    {"method":"card","rate_bp":0,"net":4399,"tax":0,"gross":4399}]}},
- {"z_number":42,"report":{"day":"2026-07-02","gross":900,"method_tax_bands":[
+ {"z_number":42,"report":{"from":"2026-07-02T09:00:00+01:00","to":"2026-07-02T21:00:00+01:00","gross":900,"method_tax_bands":[
    {"method":"cash","rate_bp":500,"net":2000,"tax":100,"gross":2100},
    {"method":"card","rate_bp":2000,"net":-1000,"tax":-200,"gross":-1200}]}}
 ]`
@@ -68,7 +69,7 @@ const (
 	obligationsBody   = `{"obligations":[{"periodKey":"26A1","start":"2026-07-01","end":"2026-09-30","due":"2026-11-07","status":"O"},{"periodKey":"26A2","start":"2026-10-01","end":"2026-12-31","due":"2027-02-07","status":"O"}]}`
 	submitReceipt     = `{"processingDate":"2026-10-02T10:15:00.000Z","paymentIndicator":"BANK","formBundleNumber":"256660290587","chargeRefNumber":"aCxFaNx0FZsCvyWF"}`
 	wantSubmitBody    = `{"periodKey":"26A1","vatDueSales":69.10,"vatDueAcquisitions":0.00,"totalVatDue":69.10,"vatReclaimedCurrPeriod":15.00,"netVatDue":54.10,"totalValueSalesExVAT":404,"totalValuePurchasesExVAT":900,"totalValueGoodsSuppliedExVAT":0,"totalAcquisitionsExVAT":0,"finalised":true}`
-	wantVendorVersion = "ut-plugin-tax-uk=1.2.2"
+	wantVendorVersion = "ut-plugin-tax-uk=1.3.0"
 )
 
 // happyHMRC answers the three sandbox calls; anything else is a test bug.
@@ -454,5 +455,85 @@ func TestManifestDeclaresMTDExport(t *testing.T) {
 	}
 	if strings.Contains(perms, "net:api.service.hmrc.gov.uk") {
 		t.Error("production HMRC host granted — out of scope until HMRC approval")
+	}
+}
+
+// --- vat-figures-uk: the accountant export (ut-docs#5052) ---
+
+// The figures export must work with NO hmrc_* setting and make NO network
+// call, and returns a CSV inline the way core's file downloads expect.
+func TestVATFiguresExport_NoNetworkNoSettings(t *testing.T) {
+	h := &stubHost{settings: map[string]string{}, storage: map[string][]byte{}, respond: func(c httpCall) (int, string, bool) {
+		t.Errorf("figures export made an HTTP call: %s %s", c.Method, c.URL)
+		return 500, "", false
+	}}
+	out, _ := run(t, mtdWasm(t), h, mtdEvent("2026-07-01", "2026-07-02", "vat-figures-uk", mtdClosesJSON))
+	if len(h.calls) != 0 {
+		t.Fatalf("made %d HTTP calls, want 0", len(h.calls))
+	}
+	r := decodeExport(t, out)
+	if !r.OK || r.Filename != "vat-figures-2026-07-01_2026-07-02.csv" || r.ContentB64 == "" || r.Error != "" {
+		t.Fatalf("response = %+v", r)
+	}
+	raw, err := base64.StdEncoding.DecodeString(r.ContentB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csv := string(raw)
+	// Same closes as the bridge test: Box 1 = 20.00+50.10+0+1.00-2.00 = 69.10, Box 6 = 404.
+	for _, want := range []string{"Box 1,VAT due on sales,69.10\r\n", "Box 6,Total value of sales ex VAT (whole pounds),404\r\n", "41,2026-07-01T09:00:00+01:00,2026-07-01T21:00:00+01:00,", "42,2026-07-02T09:00:00+01:00,2026-07-02T21:00:00+01:00,"} {
+		if !strings.Contains(csv, want) {
+			t.Errorf("CSV missing %q:\n%s", want, csv)
+		}
+	}
+}
+
+func TestVATFiguresExport_RefusesWithoutNetwork(t *testing.T) {
+	h := &stubHost{settings: map[string]string{}, storage: map[string][]byte{}}
+	for name, ev := range map[string]string{
+		"no closes":    mtdEvent("2026-07-01", "2026-07-31", "vat-figures-uk", "[]"),
+		"no range":     mtdEvent("", "", "vat-figures-uk", mtdClosesJSON),
+		"no cross-tab": mtdEvent("2026-07-01", "2026-07-31", "vat-figures-uk", `[{"z_number":9,"report":{"from":"2026-07-01T09:00:00+01:00","to":"2026-07-01T21:00:00+01:00","gross":5000}}]`),
+		"not granted":  `{"type":"export.requested.ask","payload":{"from":"2026-07-01","to":"2026-07-31","entry_key":"vat-figures-uk","eod_closes":null}}`,
+	} {
+		out, _ := run(t, mtdWasm(t), h, ev)
+		r := decodeExport(t, out)
+		if r.OK || r.Error == "" || r.ContentB64 != "" {
+			t.Errorf("%s: response = %+v, want a refusal", name, r)
+		}
+	}
+	if len(h.calls) != 0 {
+		t.Errorf("refusals made %d HTTP calls, want 0", len(h.calls))
+	}
+}
+
+func TestManifestDeclaresVATFiguresExport(t *testing.T) {
+	b, err := os.ReadFile("../../manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Permissions []string `json:"permissions"`
+		Entries     []struct {
+			Type     string   `json:"type"`
+			Key      string   `json:"key"`
+			Label    string   `json:"label"`
+			Entities []string `json:"entities"`
+		} `json:"entries"`
+	}
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, e := range m.Entries {
+		if e.Key == "vat-figures-uk" {
+			found = true
+			if e.Type != "export" || e.Label != "tax_uk.entry_vat_figures_label" || len(e.Entities) != 1 || e.Entities[0] != "eod_closes" {
+				t.Errorf("vat-figures entry = %+v", e)
+			}
+		}
+	}
+	if !found {
+		t.Error("entries[] missing vat-figures-uk")
 	}
 }

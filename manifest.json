@@ -1,8 +1,8 @@
 {
   "id": "com.universaltill.tax-uk",
   "name": "UK VAT: Eat-in / Takeaway",
-  "version": "1.2.2",
-  "description": "Implements the UK VAT eat-in/takeaway switch (VAT Notice 709/1) and the UK service-charge/tip defaults, plus a sandbox-only Making Tax Digital (MTD) VAT return bridge: Box 1 and Box 6 computed from archived day-closes, the remaining boxes merchant-entered, submitted server-to-server to HMRC's test API.",
+  "version": "1.3.0",
+  "description": "Implements the UK VAT eat-in/takeaway switch (VAT Notice 709/1) and the UK service-charge/tip defaults, plus a VAT return figures CSV export for the shop's accountant (no HMRC connection) and a sandbox-only Making Tax Digital (MTD) VAT return bridge: Box 1 and Box 6 computed from archived day-closes, the remaining boxes merchant-entered, submitted server-to-server to HMRC's test API.",
   "author": "Universal Till",
   "website": "https://universaltill.com",
   "canonical_type": "tax",
@@ -38,6 +38,15 @@
       "key": "mtd-vat-return-uk",
       "label": "tax_uk.entry_mtd_vat_label",
       "sort_order": 10,
+      "entities": [
+        "eod_closes"
+      ]
+    },
+    {
+      "type": "export",
+      "key": "vat-figures-uk",
+      "label": "tax_uk.entry_vat_figures_label",
+      "sort_order": 9,
       "entities": [
         "eod_closes"
       ]
