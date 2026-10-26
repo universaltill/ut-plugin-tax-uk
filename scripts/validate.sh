@@ -32,6 +32,9 @@ if net != ["net:test-api.service.hmrc.gov.uk"]:
 mtd = [e for e in m.get("entries", []) if e.get("key") == "mtd-vat-return-uk"]
 if len(mtd) != 1 or mtd[0].get("type") != "export" or mtd[0].get("entities") != ["eod_closes"]:
     errs.append("expected exactly one export entry mtd-vat-return-uk declaring entities ['eod_closes']")
+fig = [e for e in m.get("entries", []) if e.get("key") == "vat-figures-uk"]
+if len(fig) != 1 or fig[0].get("type") != "export" or fig[0].get("entities") != ["eod_closes"]:
+    errs.append("expected exactly one export entry vat-figures-uk declaring entities ['eod_closes'] (accountant CSV, ut-docs#5052)")
 for p in ("sales:read", "storage"):
     if p not in m.get("permissions", []):
         errs.append(f"missing permission {p} (MTD export: eod_closes needs sales:read, token cache needs storage)")

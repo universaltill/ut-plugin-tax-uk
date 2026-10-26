@@ -73,6 +73,10 @@ func storageSet(kPtr, kLen, vPtr, vLen uint32) int32
 // dsfinvkExportEntryKey.
 const mtdVATReturnEntryKey = "mtd-vat-return-uk"
 
+// vatFiguresEntryKey is the accountant export (ut-docs#5052): the same
+// Box 1/6 figures as a CSV, no HMRC connection, no hmrc_* setting.
+const vatFiguresEntryKey = "vat-figures-uk"
+
 func ptrOf(b []byte) (uint32, uint32) {
 	if len(b) == 0 {
 		return 0, 0
@@ -344,6 +348,27 @@ func handleMTDVATExport(from, to string, closes []hmrcvat.EODCloseExport) {
 	os.Exit(0)
 }
 
+// handleVATFiguresExport answers export.requested.ask for vat-figures-uk:
+// pure local computation from the archived day-closes, returned inline as a
+// CSV (content_b64). No network call and no settings are read, so it works
+// for every UK shop without HMRC production access.
+func handleVATFiguresExport(from, to string, closes []hmrcvat.EODCloseExport) {
+	if closes == nil {
+		exportFail("the till sent no eod_closes for this export — the plugin needs the sales:read permission granted (and the entry must declare the eod_closes entity); check the plugin's permissions in Settings")
+	}
+	f, err := hmrcvat.BuildFigures(closes, from, to)
+	if err != nil {
+		exportFail(err.Error())
+	}
+	logf("tax-uk: vat figures export built from=%s to=%s closes=%d", from, to, len(f.Closes))
+	fmt.Print(string(mustJSON(struct {
+		OK         bool   `json:"ok"`
+		Filename   string `json:"filename"`
+		ContentB64 string `json:"content_b64"`
+	}{true, f.Filename(), base64.StdEncoding.EncodeToString(f.CSV())})))
+	os.Exit(0)
+}
+
 // taxRateAskPayload mirrors universal-till's internal/pages/tax_hook.go.
 // OrderType has three wire values: "" (dine-in/eat-in, the unchanged
 // default), "takeaway", and "none" (the shop has the dine-in/takeaway choice
@@ -454,8 +479,10 @@ func main() {
 		switch payload.EntryKey {
 		case mtdVATReturnEntryKey:
 			handleMTDVATExport(payload.From, payload.To, payload.EODCloses)
+		case vatFiguresEntryKey:
+			handleVATFiguresExport(payload.From, payload.To, payload.EODCloses)
 		default:
-			logf("tax-uk: export.requested.ask for entry_key=%q, not ours (%q) — declining", payload.EntryKey, mtdVATReturnEntryKey)
+			logf("tax-uk: export.requested.ask for entry_key=%q, not ours (%q, %q) — declining", payload.EntryKey, mtdVATReturnEntryKey, vatFiguresEntryKey)
 			os.Exit(0)
 		}
 
