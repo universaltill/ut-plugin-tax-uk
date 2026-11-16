@@ -1,10 +1,11 @@
 // Package wasmrun_test runs the REAL compiled plugin through a real wazero
 // runtime — the same engine `universal-till` uses
-// (internal/plugins/wasm_runtime.go) — with a minimal stand-in for the five
-// host functions this plugin imports (`ut.log_write`, `ut.settings_get`,
-// and, since ut-docs#1475's MTD VAT bridge, `ut.http_request`,
-// `ut.storage_get`, `ut.storage_set`). Every import needs a stub here or
-// the module will not instantiate at all.
+// (internal/plugins/wasm_runtime.go) — with a minimal stand-in for the
+// host functions this plugin imports (`ut.log_write`, `ut.settings_get`).
+// `ut.http_request`/`ut.storage_*` stubs remain from when the MTD bridge
+// lived here (moved to ut-plugin-export-mtd-uk, ut-docs#6289); the module no
+// longer imports them. Every import needs a stub here or the module will
+// not instantiate at all.
 //
 // Why this exists (ut-docs#975 review): `src/main.go` is `GOOS=wasip1`-only,
 // so neither `go test ./...` nor a host `go vet` ever sees its event

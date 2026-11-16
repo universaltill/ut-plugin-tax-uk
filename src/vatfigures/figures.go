@@ -1,4 +1,4 @@
-package hmrcvat
+package vatfigures
 
 import (
 	"bytes"
@@ -11,8 +11,8 @@ import (
 
 // Figures is the accountant export (ut-docs#5052): the VAT return figures the
 // till can truthfully compute from archived day-closes, with no HMRC
-// connection and no hmrc_* setting. Box 1 and Box 6 use exactly the sums
-// BuildSubmitRequest uses; Boxes 2/4/7/8/9 are the accountant's and are left
+// connection and no setting. Box 1 and Box 6 are the same sums ut-plugin-export-mtd-uk's
+// submission builder uses; Boxes 2/4/7/8/9 are the accountant's and are left
 // blank, and Boxes 3/5 are not shown because they depend on them.
 type Figures struct {
 	From, To string
@@ -40,7 +40,7 @@ type CloseFigures struct {
 	Net, Tax, Gross Amount
 }
 
-// BuildFigures sums the closes. Same refusals as BuildSubmitRequest: an
+// BuildFigures sums the closes. Same refusals as the MTD submission builder in ut-plugin-export-mtd-uk: an
 // explicit range, at least one close, and no close with sales but no
 // cross-tab (refused by Z-number rather than silently counted as zero).
 func BuildFigures(closes []EODCloseExport, from, to string) (Figures, error) {

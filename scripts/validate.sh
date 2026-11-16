@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Validates the tax-plugin manifest: marketplace-required fields
 # (id/name/semver/permissions/locales), wasm runtime, canonical_type "tax"
-# (ADR-0025), and one entries[] item of type="tax". Since ut-docs#1475 the
-# plugin also has one "export" entry (the sandbox-only MTD VAT return
-# bridge), so the only outbound host it may request is HMRC's sandbox —
-# production stays refused until HMRC approval (see README).
+# (ADR-0025), and one entries[] item of type="tax". This plugin is
+# auto-installed on a new UK till (ADR-0172), so its manifest must stay
+# eligible (section 2.4): markets ["GB"], min_pos_version at least 0.30.11
+# (first till with manifest markets, ut-docs#3176), and permissions limited
+# to the allow-list events:receive, sales:read, storage. No net: host, no
+# fiscal.* hook. The MTD export lives in ut-plugin-export-mtd-uk (ut-docs#6289).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 - <<'PY'
@@ -26,20 +28,29 @@ if m.get("canonical_type") != "tax": errs.append("canonical_type must be 'tax' (
 if m.get("countries") != ["GB"]: errs.append("countries must be ['GB'] (ADR-0025 decision 3 — forward-looking metadata field, not yet enforced by the marketplace schema)")
 types = [e.get("type") for e in m.get("entries", [])]
 if "tax" not in types: errs.append("expected an entries[] item with type=tax")
-net = sorted(p for p in m.get("permissions", []) if p.startswith("net:"))
-if net != ["net:test-api.service.hmrc.gov.uk"]:
-    errs.append(f"the only net: permission allowed is net:test-api.service.hmrc.gov.uk (MTD sandbox; production needs HMRC approval first), got {net}")
-mtd = [e for e in m.get("entries", []) if e.get("key") == "mtd-vat-return-uk"]
-if len(mtd) != 1 or mtd[0].get("type") != "export" or mtd[0].get("entities") != ["eod_closes"]:
-    errs.append("expected exactly one export entry mtd-vat-return-uk declaring entities ['eod_closes']")
+if m.get("markets") != ["GB"]: errs.append("markets must be ['GB']: an empty markets is never auto-installed (ADR-0172 section 2.1)")
+mm = re.match(r'^(\d+)\.(\d+)\.(\d+)$', m.get("min_pos_version") or "")
+if not mm or tuple(int(x) for x in mm.groups()) < (0, 30, 11):
+    errs.append("min_pos_version must be at least 0.30.11, the first till release carrying manifest markets (ut-docs#3176)")
+if not m.get("id", "").startswith("com.universaltill."): errs.append("id must carry the reserved com.universaltill. prefix (ADR-0172 section 2.2)")
+allow = {"events:receive", "sales:read", "storage"}
+extra = sorted(set(m.get("permissions", [])) - allow)
+if extra:
+    errs.append(f"permissions outside the ADR-0172 auto-install allow-list {sorted(allow)}: {extra} (a net: host belongs in a separate plugin, e.g. ut-plugin-export-mtd-uk)")
+for h in m.get("hooks", []):
+    if str(h.get("event", "")).startswith("fiscal."): errs.append(f"fiscal hook {h.get('event')} makes the plugin ineligible for auto-install")
+for p in m.get("provides", []) or []:
+    if str(p).startswith("fiscal."): errs.append(f"provides {p} makes the plugin ineligible for auto-install")
+if any(e.get("key") == "mtd-vat-return-uk" for e in m.get("entries", [])):
+    errs.append("the MTD export lives in ut-plugin-export-mtd-uk (ut-docs#6289)")
 fig = [e for e in m.get("entries", []) if e.get("key") == "vat-figures-uk"]
 if len(fig) != 1 or fig[0].get("type") != "export" or fig[0].get("entities") != ["eod_closes"]:
     errs.append("expected exactly one export entry vat-figures-uk declaring entities ['eod_closes'] (accountant CSV, ut-docs#5052)")
 for p in ("sales:read", "storage"):
     if p not in m.get("permissions", []):
-        errs.append(f"missing permission {p} (MTD export: eod_closes needs sales:read, token cache needs storage)")
+        errs.append(f"missing permission {p} (figures export: eod_closes needs sales:read)")
 if "export.requested.ask" not in [h.get("event") for h in m.get("hooks", [])]:
-    errs.append("hooks[] must declare export.requested.ask for the MTD export entry")
+    errs.append("hooks[] must declare export.requested.ask for the vat-figures-uk export entry")
 # A map/list-typed setting must declare a real JSON object/list default, not
 # a JSON string that merely contains one ("{}"): core's install path
 # json.Marshal()s default_value, so a string-wrapped "{}" is stored
@@ -55,12 +66,6 @@ for s in m.get("settings", []):
             continue
         if isinstance(parsed, (dict, list)):
             errs.append(f"setting {s.get('key')}'s default_value is a JSON-string-wrapped object/list ({dv!r}) instead of a real JSON object/list — double-encodes at plugin-install time (ut-docs#1255, ut-docs#1270)")
-defaults = {s.get("key"): s.get("default_value") for s in m.get("settings", [])}
-for k in ("hmrc_client_id","hmrc_client_secret","hmrc_refresh_token","hmrc_vrn","hmrc_box2_vat_due_acquisitions","hmrc_box4_vat_reclaimed","hmrc_box7_purchases_ex_vat","hmrc_box8_goods_supplied_ex_vat","hmrc_box9_acquisitions_ex_vat"):
-    if k not in defaults: errs.append(f"missing setting {k}")
-    elif defaults[k] != "": errs.append(f"setting {k} must have an empty default (never guessed)")
-if defaults.get("hmrc_api_base") != "https://test-api.service.hmrc.gov.uk":
-    errs.append("hmrc_api_base must default to the HMRC sandbox")
 # A declared "docs" page entry (ADR-0037) must ship real content, or the
 # Docs button opens the "registered a page but ships no page content" stub
 # — the broken affordance ut-docs#406's AC3 explicitly forbids.

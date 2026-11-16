@@ -1,4 +1,4 @@
-package hmrcvat
+package vatfigures
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ func closeWith(z int64, day string, gross int64, bands ...MethodTaxBand) EODClos
 }
 
 // TestBuildFigures_BoxesRatesAndCloses pins the accountant export: Box 1/6
-// come from the cross-tab exactly as the HMRC bridge computes them, the
+// come from the cross-tab exactly as the MTD export plugin computes them, the
 // manual boxes are left BLANK (never 0 — a till has no purchase ledger), and
 // the per-rate / per-close lines add up to the same totals.
 func TestBuildFigures_BoxesRatesAndCloses(t *testing.T) {
@@ -114,7 +114,7 @@ func TestBuildFigures_NegativeNetTruncatesTowardZero(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Box6 != -10 {
-		t.Errorf("Box6 = %d, want -10 (toward zero, as the HMRC bridge)", got.Box6)
+		t.Errorf("Box6 = %d, want -10 (toward zero, as the MTD export plugin)", got.Box6)
 	}
 }
 
@@ -139,8 +139,7 @@ func TestBuildFigures_MissingZWarned(t *testing.T) {
 // TestCrossTabProblem pins the empty-cross-tab check (ut-docs#5055 item 2):
 // core's identity is sum(cross-tab gross) == gross - refund_total -
 // multi-purpose vouchers_issued, so a close with no cross-tab is refused only
-// when that gap is non-zero. Each row runs through BOTH the bridge and the
-// figures export, which share one helper.
+// when that gap is non-zero. Each row runs through the figures export.
 func TestCrossTabProblem(t *testing.T) {
 	mkTax := func(gross, refund, vouchers, taxNet int64) EODCloseExport {
 		return EODCloseExport{ZNumber: 43, Report: EODReportForExport{
@@ -166,32 +165,24 @@ func TestCrossTabProblem(t *testing.T) {
 		{"offsetting sale and return at different rates", mkTax(6000, 6000, 0, 1000), []string{"Z43", "£0.00", "VAT £10.00"}, nil},
 		{"balanced sale and return, same rate", mkTax(6000, 6000, 0, 0), nil, nil},
 	}
-	base, err := BuildSubmitRequest(fixtureCloses(), ManualBoxes{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	baseFig, err := BuildFigures(fixtureCloses(), "2026-07-01", "2026-07-31")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, r := range rows {
 		closes := append(fixtureCloses(), r.c)
-		req, errB := BuildSubmitRequest(closes, ManualBoxes{})
 		fig, errF := BuildFigures(closes, "2026-07-01", "2026-07-31")
 		if len(r.want) == 0 {
-			if errB != nil || errF != nil {
-				t.Errorf("%s: refused: bridge=%v figures=%v", r.name, errB, errF)
+			if errF != nil {
+				t.Errorf("%s: refused: %v", r.name, errF)
 				continue
-			}
-			if req.VATDueSales != base.VATDueSales || req.TotalValueSalesExVAT != base.TotalValueSalesExVAT {
-				t.Errorf("%s: bridge boxes moved: %+v", r.name, req)
 			}
 			if fig.Box1 != baseFig.Box1 || fig.NetSales != baseFig.NetSales {
 				t.Errorf("%s: figures moved: %+v", r.name, fig)
 			}
 			continue
 		}
-		for who, err := range map[string]error{"bridge": errB, "figures": errF} {
+		for who, err := range map[string]error{"figures": errF} {
 			if err == nil {
 				t.Errorf("%s/%s: accepted, want refusal", r.name, who)
 				continue
@@ -220,7 +211,7 @@ func TestEODCloseExport_DecodesVoucherFields(t *testing.T) {
 	if c.Report.VouchersIssued != 2500 || c.Report.Gross != 2500 {
 		t.Fatalf("decoded %+v", c.Report)
 	}
-	if _, err := BuildSubmitRequest([]EODCloseExport{c}, ManualBoxes{}); err != nil {
+	if _, err := BuildFigures([]EODCloseExport{c}, "2026-07-01", "2026-07-31"); err != nil {
 		t.Errorf("voucher-only close refused: %v", err)
 	}
 	var r EODCloseExport
