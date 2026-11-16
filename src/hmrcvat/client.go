@@ -49,7 +49,7 @@ const (
 	// Fraud Prevention Headers. VendorVersion must equal manifest.json's
 	// version (pinned by TestVendorVersionMatchesManifest).
 	VendorProductName = "Universal Till"
-	VendorVersion     = "1.3.0"
+	VendorVersion     = "1.3.1"
 	vendorSoftwareKey = "ut-plugin-tax-uk"
 
 	// TokenStorageKey is the plugin-storage key the access token and the
@@ -146,14 +146,22 @@ type EODReportForExport struct {
 	From string `json:"from,omitempty"`
 	To   string `json:"to,omitempty"`
 	// Gross is the close's own headline gross (core's EODReport.Gross). Read
-	// only to detect a close that HAD sales but carries no cross-tab (an
-	// archive row from before ut-docs#1004 added method_tax_bands) — such a
-	// close would otherwise contribute 0 to Box 1/6 and silently
-	// under-report the period, so BuildSubmitRequest refuses it by Z-number.
+	// only for the cross-tab gap check (crossTabProblem).
 	Gross int64 `json:"gross"`
+	// RefundTotal is core's EODReport.RefundTotal (positive); VouchersIssued
+	// is multi-purpose voucher issuance only (core voucher_repo.go:906).
+	// With Gross they give core's identity sum(cross-tab gross) ==
+	// Gross - RefundTotal - VouchersIssued; read only by crossTabProblem.
+	RefundTotal    int64 `json:"refund_total"`
+	VouchersIssued int64 `json:"vouchers_issued"`
+	// TaxNet is core's EODReport.TaxNet (sales' tax minus returns' tax);
+	// core's identity sum(cross-tab tax) == TaxNet. Read only by
+	// crossTabProblem: a sale and a return at different VAT rates can net
+	// the gross gap to zero while leaving VAT due (ut-docs#5055 review).
+	TaxNet int64 `json:"tax_net"`
 	// MethodTaxBands is the payment-method x VAT-rate cross-tab
 	// (ut-docs#1004). Returns are already signed negative in it, and
-	// voucher issuance (a liability) and tips (held out of revenue) are
+	// **multi-purpose** voucher issuance (a liability) and tips (held out of revenue) are
 	// already excluded, so summing it gives the period's taxable turnover.
 	MethodTaxBands []MethodTaxBand `json:"method_tax_bands"`
 }
@@ -315,8 +323,8 @@ func BuildSubmitRequest(closes []EODCloseExport, manual ManualBoxes) (SubmitRetu
 	var problems []string
 	var tax, net int64
 	for _, c := range closes {
-		if len(c.Report.MethodTaxBands) == 0 && c.Report.Gross != 0 {
-			problems = append(problems, fmt.Sprintf("close Z%d (%s) has sales (gross £%s) but no VAT cross-tab (method_tax_bands) — archived before the cross-tab existed, so its share of Box 1/6 cannot be computed; narrow the range to closes that carry one", c.ZNumber, c.Report.Day, Amount(c.Report.Gross)))
+		if p := crossTabProblem(c, "its share of Box 1/6 cannot be computed"); p != "" {
+			problems = append(problems, p)
 			continue
 		}
 		for _, b := range c.Report.MethodTaxBands {

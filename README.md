@@ -93,7 +93,12 @@ returned as a CSV download `vat-figures-<from>_<to>.csv`:
 - The CSV states it assumes standard (invoice-basis) VAT accounting, not
   the Flat Rate Scheme.
 - Same refusals as the bridge: explicit range, at least one close, and a
-  close with sales but no cross-tab is refused by Z-number.
+  close whose cross-tab is empty is refused when gross − refunds −
+  multi-purpose vouchers issued ≠ 0 or its net VAT (`tax_net`) ≠ 0 (core's
+  reconciliation identities), naming its Z, its window and the unexplained
+  amount. A close that only
+  issued multi-purpose vouchers is accepted and adds 0 to Box 1/6 (voucher
+  issuance is a liability, not a supply).
 - It is labelled "figures for your accountant", never a filed return.
   Whether the cross-tab is the right Box 1/6 source for flat-rate or
   cash-accounting schemes is the same open accountant question as above.
@@ -114,9 +119,13 @@ that is **exactly** one open VAT period. The plugin then:
      excluded by core).
    - **Box 6** `totalValueSalesExVAT` = sum of cross-tab `net`, whole
      pounds, pence left out (truncated toward zero).
-   - A close that **had sales but carries no cross-tab** (an archive row
-     from before the cross-tab existed) is refused by Z-number rather than
-     silently counted as zero.
+   - A close whose **cross-tab is empty** is refused by Z-number, naming its
+     window and the unexplained amount, when gross − refunds − multi-purpose
+     vouchers issued ≠ 0 or its net VAT ≠ 0 (an archive row from before the
+     cross-tab existed; a sale and an equal return at different VAT rates
+     zero the gross but not the VAT),
+     rather than silently counted as zero. A voucher-only close is accepted
+     and adds 0 to Box 1/6.
    - **Boxes 2, 4, 7, 8, 9** = the merchant's settings, verbatim. A till
      has no purchase ledger, so these are **never computed**.
    - **Box 3** `totalVatDue` = Box 1 + Box 2; **Box 5** `netVatDue` =
@@ -194,8 +203,9 @@ empty. Enter `0` explicitly for a box that is nil for the period.
 - **Boxes 2/4/7/8/9 are manual** and are not reset between periods — a
   stale value from last quarter would be re-submitted if not updated.
 - **Unclosed days are not detected.** The plugin refuses when there are
-  no archived closes at all, and refuses a close that had sales but no
-  VAT cross-tab, but does not check that the closes cover every trading
+  no archived closes at all, and refuses a close whose empty cross-tab leaves
+  gross − refunds − multi-purpose vouchers issued (or net VAT) unexplained,
+  but does not check that the closes cover every trading
   day of the period — a day that was never closed is simply missing from
   Box 1/6.
 - **The plugin cannot read the real time.** `universal-till` runs plugins
@@ -269,7 +279,10 @@ end to end against a scripted HTTP layer (`src/wasmrun/mtd_test.go`; see
 the MTD status table), including the one-shot re-authentication when HMRC
 rejects a cached access token. Not proven: `universal-till`'s real
 host-function implementations or a real installed-plugin run through the
-till UI. `scripts/validate.sh` passes. Not yet installed via a real marketplace
+till UI. The wasmrun suite also pins that the figures export accepts a
+voucher-only close (empty cross-tab, gross = multi-purpose vouchers issued)
+and refuses a refunds-only close with no cross-tab, naming the signed amount
+(ut-docs#5055). `scripts/validate.sh` passes. Not yet installed via a real marketplace
 flow — first installed directly (DB + filesystem, bypassing marketplace
 signing) for local dev testing, matching how this codebase's own tests
 install plugins.
