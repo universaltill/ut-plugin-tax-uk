@@ -80,7 +80,7 @@ jobs:
       - name: Publish to marketplace
         if: github.event_name == 'push' || inputs.publish
         env:
-          MARKETPLACE_BASE_URL: ${{ secrets.MARKETPLACE_BASE_URL }}
+          MARKETPLACE_BASE_URL: ${{ vars.MARKETPLACE_BASE_URL }}
           MARKETPLACE_UPLOAD_TOKEN: ${{ secrets.MARKETPLACE_UPLOAD_TOKEN }}
           MARKETPLACE_LISTING_ID: ${{ vars.MARKETPLACE_LISTING_ID }}
           MARKETPLACE_CHANNEL: ${{ inputs.channel || 'stable' }}
@@ -92,6 +92,6 @@ jobs:
       - name: Auto-approve on the dev marketplace
         if: (github.event_name == 'push' || inputs.publish) && vars.AUTO_APPROVE == 'true'
         env:
-          MARKETPLACE_BASE_URL: ${{ secrets.MARKETPLACE_BASE_URL }}
+          MARKETPLACE_BASE_URL: ${{ vars.MARKETPLACE_BASE_URL }}
           MARKETPLACE_UPLOAD_TOKEN: ${{ secrets.MARKETPLACE_UPLOAD_TOKEN }}
         run: scripts/approve.sh
