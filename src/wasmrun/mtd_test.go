@@ -69,7 +69,7 @@ const (
 	obligationsBody   = `{"obligations":[{"periodKey":"26A1","start":"2026-07-01","end":"2026-09-30","due":"2026-11-07","status":"O"},{"periodKey":"26A2","start":"2026-10-01","end":"2026-12-31","due":"2027-02-07","status":"O"}]}`
 	submitReceipt     = `{"processingDate":"2026-10-02T10:15:00.000Z","paymentIndicator":"BANK","formBundleNumber":"256660290587","chargeRefNumber":"aCxFaNx0FZsCvyWF"}`
 	wantSubmitBody    = `{"periodKey":"26A1","vatDueSales":69.10,"vatDueAcquisitions":0.00,"totalVatDue":69.10,"vatReclaimedCurrPeriod":15.00,"netVatDue":54.10,"totalValueSalesExVAT":404,"totalValuePurchasesExVAT":900,"totalValueGoodsSuppliedExVAT":0,"totalAcquisitionsExVAT":0,"finalised":true}`
-	wantVendorVersion = "ut-plugin-tax-uk=1.3.0"
+	wantVendorVersion = "ut-plugin-tax-uk=1.3.1"
 )
 
 // happyHMRC answers the three sandbox calls; anything else is a test bug.
@@ -485,6 +485,47 @@ func TestVATFiguresExport_NoNetworkNoSettings(t *testing.T) {
 		if !strings.Contains(csv, want) {
 			t.Errorf("CSV missing %q:\n%s", want, csv)
 		}
+	}
+}
+
+// A close that only issued multi-purpose vouchers has an empty cross-tab but
+// is fully explained (gross - refunds - vouchers_issued = 0): accepted, adds
+// nothing to Box 1/6 (ut-docs#5055).
+func TestVATFiguresExport_AcceptsVoucherOnlyClose(t *testing.T) {
+	h := &stubHost{settings: map[string]string{}, storage: map[string][]byte{}, respond: func(c httpCall) (int, string, bool) {
+		t.Errorf("figures export made an HTTP call: %s %s", c.Method, c.URL)
+		return 500, "", false
+	}}
+	closes := strings.TrimSuffix(strings.TrimSpace(mtdClosesJSON), "]") + `,
+ {"z_number":43,"report":{"from":"2026-07-03T09:00:00+01:00","to":"2026-07-03T21:00:00+01:00","gross":2500,"vouchers_issued":2500}}]`
+	out, _ := run(t, mtdWasm(t), h, mtdEvent("2026-07-01", "2026-07-31", "vat-figures-uk", closes))
+	r := decodeExport(t, out)
+	if !r.OK || r.Error != "" {
+		t.Fatalf("voucher-only close refused: %+v", r)
+	}
+	raw, err := base64.StdEncoding.DecodeString(r.ContentB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Box 1,VAT due on sales,69.10\r\n", "Box 6,Total value of sales ex VAT (whole pounds),404\r\n"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("CSV missing %q:\n%s", want, raw)
+		}
+	}
+	if len(h.calls) != 0 {
+		t.Errorf("made %d HTTP calls, want 0", len(h.calls))
+	}
+}
+
+// A refunds-only close with no cross-tab (gross 0) was silently counted as 0
+// under the old gross != 0 predicate; it must be refused, naming Z9 and the
+// signed unexplained amount (ut-docs#5055).
+func TestVATFiguresExport_NoCrossTabRefusalNamesAmount(t *testing.T) {
+	h := &stubHost{settings: map[string]string{}, storage: map[string][]byte{}}
+	out, _ := run(t, mtdWasm(t), h, mtdEvent("2026-07-01", "2026-07-31", "vat-figures-uk", `[{"z_number":9,"report":{"from":"2026-07-01T09:00:00+01:00","to":"2026-07-01T21:00:00+01:00","gross":0,"refund_total":1200,"tax_net":-200}}]`))
+	r := decodeExport(t, out)
+	if r.OK || !strings.Contains(r.Error, "-£12.00") || !strings.Contains(r.Error, "Z9") {
+		t.Errorf("response = %+v, want refusal naming Z9 and -£12.00", r)
 	}
 }
 
